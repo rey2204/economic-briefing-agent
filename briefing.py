@@ -85,10 +85,18 @@ SOURCE DATA:
             "messages": [{"role": "user", "content": prompt}]
         },
         timeout=60
-    ).json()
+    )
+    
+    claude_response = claude_response.json()
+    
+    # Check if Anthropic returned an error instead of a briefing
+    if "error" in claude_response:
+        print(f"ANTHROPIC API ERROR: {claude_response['error']}")
+        return
 
     briefing_html = claude_response["content"][0]["text"]
-    date_str = datetime.now().strftime("%B %d, %Y")
+        
+        date_str = datetime.now().strftime("%B %d, %Y")
     subject = f"Economic Intelligence Briefing — {date_str}"
 
     # 4. Wrap in a clean email template
