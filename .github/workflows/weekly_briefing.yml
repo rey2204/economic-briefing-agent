@@ -1,0 +1,30 @@
+name: Weekly Economic Briefing
+
+on:
+  schedule:
+    # Runs every Monday at 1:00 AM UTC (Sunday at 5:00 PM PST)
+    - cron: '0 1 * * 1'
+  workflow_dispatch: 
+
+jobs:
+  run-briefing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Dependencies
+        run: |
+          pip install requests boto3
+
+      - name: Execute Script
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: "us-east-2"
+        run: python briefing.py
