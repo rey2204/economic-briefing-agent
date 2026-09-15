@@ -77,7 +77,7 @@ SOURCE DATA:
             "content-type": "application/json"
         },
         json={
-            "model": "model": "claude-sonnet-4-6",
+            "model": "claude-sonnet-4-6",
             "max_tokens": 2000,
             "messages": [{"role": "user", "content": prompt}]
         },
