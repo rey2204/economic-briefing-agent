@@ -7,7 +7,7 @@ from datetime import datetime
 ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
 SES_CLIENT = boto3.client("ses", region_name="us-east-2")
 
-# 1. Define the URLs you want to read
+# List of target URLs
 SOURCES = [
     {"name": "US Bureau of Economic Analysis (BEA)", "url": "https://www.bea.gov/data"},
     {"name": "Eurostat", "url": "https://ec.europa.eu/eurostat"},
@@ -35,19 +35,17 @@ SOURCES = [
     {"name": "Trading Economics", "url": "https://tradingeconomics.com"},
     {"name": "Observatory of Economic Complexity", "url": "https://oec.world"}
 ]
+
 def main():
     collected_data = []
     print("Collecting publication data...")
     
-    # 2. Fetch clean text using Jina Reader
     for source in SOURCES:
         print(f"Reading {source['name']}...")
         try:
-            # Adding r.jina.ai before a URL extracts the clean text
             reader_url = f"https://r.jina.ai/{source['url']}"
             response = requests.get(reader_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=20)
             if response.status_code == 200:
-                # Grab up to 4,000 characters of clean text
                 content = response.text[:4000]
                 collected_data.append(f"### SOURCE: {source['name']} ({source['url']})\n{content}\n")
         except Exception as e:
@@ -55,7 +53,6 @@ def main():
 
     compiled_context = "\n".join(collected_data)
 
-    # 3. Prompt Claude to return pure HTML
     prompt = f"""You are an executive economic intelligence analyst. 
 Based ONLY on the following source materials, synthesize this week's developments into an Axios-style briefing.
 
@@ -72,7 +69,7 @@ SOURCE DATA:
 """
 
     print("Generating briefing with Claude...")
-    claude_response = requests.post(
+    claude_response_raw = requests.post(
         "https://api.anthropic.com/v1/messages",
         headers={
             "x-api-key": ANTHROPIC_API_KEY,
@@ -87,19 +84,17 @@ SOURCE DATA:
         timeout=60
     )
     
-    claude_response = claude_response.json()
-    
+    claude_response = claude_response_raw.json()
+
     # Check if Anthropic returned an error instead of a briefing
     if "error" in claude_response:
         print(f"ANTHROPIC API ERROR: {claude_response['error']}")
         return
 
     briefing_html = claude_response["content"][0]["text"]
-        
-        date_str = datetime.now().strftime("%B %d, %Y")
+    date_str = datetime.now().strftime("%B %d, %Y")
     subject = f"Economic Intelligence Briefing — {date_str}"
 
-    # 4. Wrap in a clean email template
     full_email_html = f"""
     <!DOCTYPE html>
     <html>
@@ -113,7 +108,6 @@ SOURCE DATA:
     </html>
     """
 
-    # 5. Send the email via AWS SES
     print("Sending email...")
     SES_CLIENT.send_email(
         Source="adam.karson@gmail.com",
