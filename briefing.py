@@ -81,7 +81,7 @@ SOURCE DATA:
             "max_tokens": 4096,
             "messages": [{"role": "user", "content": prompt}]
         },
-        timeout=60
+        timeout=180
     )
     
     claude_response = claude_response_raw.json()
