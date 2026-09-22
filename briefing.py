@@ -3,11 +3,11 @@ import requests
 import boto3
 from datetime import datetime, timedelta
 
-# Load credentials from GitHub 
+# Load credentials from GitHub Secrets
 ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
 SES_CLIENT = boto3.client("ses", region_name="us-east-2")
 
-# List of target URLs
+# Target publication sources for macroeconomic intelligence
 SOURCES = [
     {"name": "US Bureau of Economic Analysis (BEA)", "url": "https://www.bea.gov/data"},
     {"name": "Eurostat", "url": "https://ec.europa.eu/eurostat"},
@@ -53,21 +53,21 @@ def main():
 
     compiled_context = "\n".join(collected_data)
 
+    # Calculate rolling 7-day window
     current_date = datetime.now()
     start_date = current_date - timedelta(days=7)
-    
     date_str_current = current_date.strftime("%B %d, %Y")
     date_str_start = start_date.strftime("%B %d, %Y")
 
     prompt = f"""You are an executive economic intelligence analyst. 
 Based ONLY on the following source materials, synthesize this week's developments into an Axios-style briefing.
 
-STRICT RECENCY REQUIREMENT: Today is {date_str_current}. You must ONLY include developments, reports, and data releases published between {date_str_start} and {date_str_current}. You must actively discard and ignore any working papers, reports, or data points published prior to {date_str_start} (e.g., June 2026), even if they appear prominently in the source text. If a source only contains older materials, exclude it entirely.
+STRICT RECENCY REQUIREMENT: Today is {date_str_current}. You must ONLY include developments, reports, and data releases published between {date_str_start} and {date_str_current}. Actively discard and ignore any working papers, reports, or data points published prior to {date_str_start} (such as older static publications), even if they appear prominently on landing pages. If a source only contains older materials, omit it entirely.
 
 Formatting guidelines:
 1. Lead with the single most critical overarching macroeconomic development under a 'The Big Picture' section.
 2. Follow with 3 to 5 key developments using concise bullet points.
-3. Organize remaining analysis under clear thematic headers (Inflation, Trade, Labor, etc.).
+3. Organize remaining analysis under clear thematic headers (Inflation, Monetary Policy, Trade, Labor, etc.).
 4. Minimize academic or technical jargon; keep statements clear and impactful.
 5. Provide explicit citations and URLs for every data point or finding.
 6. Return your output as clean, semantic HTML (<p>, <ul>, <li>, <strong>, <h3>). Do not use Markdown backticks.
@@ -86,20 +86,30 @@ SOURCE DATA:
         },
         json={
             "model": "claude-sonnet-5",
-            "max_tokens": 4096,
+            "max_tokens": 16000,
             "messages": [{"role": "user", "content": prompt}]
         },
-        timeout=180
+        timeout=300
     )
     
     claude_response = claude_response_raw.json()
 
-    # Check if Anthropic returned an error instead of a briefing
+    # Verify API response validity
     if "error" in claude_response:
         print(f"ANTHROPIC API ERROR: {claude_response['error']}")
         return
 
-    briefing_html = claude_response["content"][0]["text"]
+    # Extract text block while bypassing internal thinking blocks
+    briefing_html = ""
+    for block in claude_response.get("content", []):
+        if block.get("type") == "text":
+            briefing_html = block.get("text", "")
+            break
+
+    if not briefing_html:
+        print("ERROR: No text content returned by Anthropic API.")
+        return
+
     subject = f"Economic Intelligence Briefing — {date_str_current}"
 
     full_email_html = f"""
