@@ -1,7 +1,7 @@
 import os
 import requests
 import boto3
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Load credentials from GitHub 
 ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
@@ -53,8 +53,16 @@ def main():
 
     compiled_context = "\n".join(collected_data)
 
+    current_date = datetime.now()
+    start_date = current_date - timedelta(days=7)
+    
+    date_str_current = current_date.strftime("%B %d, %Y")
+    date_str_start = start_date.strftime("%B %d, %Y")
+
     prompt = f"""You are an executive economic intelligence analyst. 
 Based ONLY on the following source materials, synthesize this week's developments into an Axios-style briefing.
+
+STRICT RECENCY REQUIREMENT: Today is {date_str_current}. You must ONLY include developments, reports, and data releases published between {date_str_start} and {date_str_current}. You must actively discard and ignore any working papers, reports, or data points published prior to {date_str_start} (e.g., June 2026), even if they appear prominently in the source text. If a source only contains older materials, exclude it entirely.
 
 Formatting guidelines:
 1. Lead with the single most critical overarching macroeconomic development under a 'The Big Picture' section.
@@ -77,7 +85,7 @@ SOURCE DATA:
             "content-type": "application/json"
         },
         json={
-            "model": "claude-sonnet-4-6",
+            "model": "claude-sonnet-5",
             "max_tokens": 4096,
             "messages": [{"role": "user", "content": prompt}]
         },
@@ -92,8 +100,7 @@ SOURCE DATA:
         return
 
     briefing_html = claude_response["content"][0]["text"]
-    date_str = datetime.now().strftime("%B %d, %Y")
-    subject = f"Economic Intelligence Briefing — {date_str}"
+    subject = f"Economic Intelligence Briefing — {date_str_current}"
 
     full_email_html = f"""
     <!DOCTYPE html>
